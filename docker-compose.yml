@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  # Config Server
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    networks:
+      - agendeja-net
+    depends_on:
+      - postgres-config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Discovery Service (Eureka)
+  discovery-service:
+    build: ./discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    networks:
+      - agendeja-net
+    depends_on:
+      - config-server
+
+  # Gateway
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    networks:
+      - agendeja-net
+    depends_on:
+      - config-server
+      - discovery-service
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    networks:
+      - agendeja-net
+    depends_on:
+      - postgres-auth
+      - config-server
+      - discovery-service
+
+  # Agendamento Service
+  agendamento-service:
+    build: ./agendamento-service
+    container_name: agendamento-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    networks:
+      - agendeja-net
+    depends_on:
+      - postgres-agendamento
+      - config-server
+      - discovery-service
+
+  # Notificacao Service
+  notificacao-service:
+    build: ./notificacao-service
+    container_name: notificacao-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    networks:
+      - agendeja-net
+    depends_on:
+      - postgres-notificacao
+      - config-server
+      - discovery-service
+      - rabbitmq
+
+  # Relatorio Service
+  relatorio-service:
+    build: ./relatorio-service
+    container_name: relatorio-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    networks:
+      - agendeja-net
+    depends_on:
+      - postgres-relatorio
+      - config-server
+      - discovery-service
+
+  # RabbitMQ (para notificações futuras)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - agendeja-net
+
+  # PostgreSQL para cada serviço
+  postgres-auth:
+    image: postgres:15
+    container_name: postgres-auth
+    environment:
+      - POSTGRES_DB=authdb
+      - POSTGRES_USER=authuser
+      - POSTGRES_PASSWORD=authpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-auth:/var/lib/postgresql/data
+    networks:
+      - agendeja-net
+
+  postgres-agendamento:
+    image: postgres:15
+    container_name: postgres-agendamento
+    environment:
+      - POSTGRES_DB=agendamentodb
+      - POSTGRES_USER=agendamentouser
+      - POSTGRES_PASSWORD=agendamentopass
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata-agendamento:/var/lib/postgresql/data
+    networks:
+      - agendeja-net
+
+  postgres-notificacao:
+    image: postgres:15
+    container_name: postgres-notificacao
+    environment:
+      - POSTGRES_DB=notificacaodb
+      - POSTGRES_USER=notificacaouser
+      - POSTGRES_PASSWORD=notificacaopass
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata-notificacao:/var/lib/postgresql/data
+    networks:
+      - agendeja-net
+
+  postgres-relatorio:
+    image: postgres:15
+    container_name: postgres-relatorio
+    environment:
+      - POSTGRES_DB=relatoriodb
+      - POSTGRES_USER=relatoriouser
+      - POSTGRES_PASSWORD=relatoriopass
+    ports:
+      - "5436:5432"
+    volumes:
+      - pgdata-relatorio:/var/lib/postgresql/data
+    networks:
+      - agendeja-net
+
+  postgres-config:
+    image: postgres:15
+    container_name: postgres-config
+    environment:
+      - POSTGRES_DB=configdb
+      - POSTGRES_USER=configuser
+      - POSTGRES_PASSWORD=configpass
+    ports:
+      - "5437:5432"
+    volumes:
+      - pgdata-config:/var/lib/postgresql/data
+    networks:
+      - agendeja-net
+
+volumes:
+  pgdata-auth:
+  pgdata-agendamento:
+  pgdata-notificacao:
+  pgdata-relatorio:
+  pgdata-config:
+
+networks:
+  agendeja-net:
+    driver: bridge 
